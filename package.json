@@ -1,0 +1,16 @@
+{
+  "name": "livestream-hls-proxy",
+  "version": "1.0.0",
+  "description": "HLS Proxy Relay for Ngidoli streaming",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.11"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Build complete'"
+  }
+}

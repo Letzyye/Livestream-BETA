@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="disable-devtools" content="true">
+    <title>Livestream</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Disable right-click context menu -->
+    <style>
+        body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
+    
+    <!-- Proteksi Source Code -->
+    <script>
+        // Disable text selection dan copy
+        document.oncontextmenu = function() {
+            return false;
+        };
+    </script>
+</head>
+<body>
+    <!-- Landing Page Container -->
+    <div id="landingPage" class="landing-container">
+        <div class="landing-content">
+            <div class="header-tabs">
+                <span class="tab-badge upcoming">Upcoming</span>
+                <span class="tab-badge regular">Regular</span>
+            </div>
+            
+            <h1 class="landing-title">Sambil Menggandeng Erat Tanganku</h1>
+            <p class="landing-show-id"># Show ID: 3075</p>
+            
+            <div class="landing-main">
+                <div class="poster-container">
+                    <img id="posterImage" src="image/poster.jpg" alt="Poster" class="poster-image" onerror="this.src='image/poster.jpg'">
+                </div>
+                
+                <div class="info-panel">
+                    <div class="info-item">
+                        <span class="info-icon">📅</span>
+                        <div class="info-content">
+                            <span class="info-label">Tanggal</span>
+                            <span class="info-value">Kamis, 12 Februari 2026</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-icon">⏰</span>
+                        <div class="info-content">
+                            <span class="info-label">Waktu</span>
+                            <span class="info-value">18.45 WIB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Container -->
+    <div id="playerContainer" class="player-container" style="display: none;">
+        <div id="iframeContainer" class="iframe-wrapper">
+            <!-- Iframe akan di-inject di sini -->
+        </div>
+        
+        <video id="livestreamVideo" class="livestream-player" controls>
+            <source id="videoSource" src="" type="application/x-mpegURL">
+        </video>
+        
+        <div id="videoControls" class="video-controls">
+            <div class="seek-hint left-hint">-10s</div>
+            <div class="seek-hint right-hint">+10s</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="script.js"></script>
+</body>
+
+
+
