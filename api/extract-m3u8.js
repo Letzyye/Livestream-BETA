@@ -14,29 +14,44 @@ function extractM3U8FromHTML(html) {
     const m3u8Urls = [];
     
     try {
-        // Pattern 1: .m3u8 dalam string
-        const pattern1 = /"([^"]*\.m3u8[^"]*)"/g;
-        let match;
-        while ((match = pattern1.exec(html)) !== null) {
-            const url = match[1];
-            if (url.includes('http') && !m3u8Urls.includes(url)) {
-                m3u8Urls.push(url);
+        // Pattern 1: Full URLs with http/https
+        const patterns = [
+            /(https?:\/\/[^\s"'<>]*\.m3u8[^\s"'<>]*)/g,
+            /"([^"]*\.m3u8[^"]*)"/g,
+            /'([^']*\.m3u8[^']*)'/g,
+            /url:\s*["']?([^\s"'<>]*\.m3u8[^\s"'<>]*)["']?/g,
+            /src:\s*["']?([^\s"'<>]*\.m3u8[^\s"'<>]*)["']?/g,
+            /href:\s*["']?([^\s"'<>]*\.m3u8[^\s"'<>]*)["']?/g,
+        ];
+        
+        for (const pattern of patterns) {
+            let match;
+            while ((match = pattern.exec(html)) !== null) {
+                let url = match[1] || match[0];
+                
+                // Skip if too short or already has duplicates
+                if (url && url.length > 5 && !m3u8Urls.includes(url)) {
+                    m3u8Urls.push(url);
+                }
             }
         }
         
-        // Pattern 2: .m3u8 dengan single quotes
-        const pattern2 = /'([^']*\.m3u8[^']*)'/g;
-        while ((match = pattern2.exec(html)) !== null) {
-            const url = match[1];
-            if (url.includes('http') && !m3u8Urls.includes(url)) {
-                m3u8Urls.push(url);
+        // Additional pattern: split by spaces and find .m3u8 files
+        const words = html.split(/[\s"'<>{}[\]()]/);
+        for (const word of words) {
+            if (word.includes('.m3u8') && word.length > 5) {
+                if (!m3u8Urls.includes(word)) {
+                    m3u8Urls.push(word);
+                }
             }
         }
+        
     } catch (e) {
         console.error('[extract-m3u8] Parse error:', e.message);
     }
     
-    return m3u8Urls;
+    // Filter valid URLs and limit to 10
+    return m3u8Urls.filter(u => u && u.length > 5).slice(0, 10);
 }
 
 module.exports = async (req, res) => {
