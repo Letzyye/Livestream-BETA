@@ -146,7 +146,7 @@ document.addEventListener('keydown', function(e) {
 */
 
 // EDIT DISINI SAJA - PASTE LINK NGIDOLIHUB ANDA:
-const DECODED_URL = 'https://play.ngidolihub.my.id/?slug=pertaruhan-cinta-2026-02-13-260201200212';
+const DECODED_URL = 'https://play.ngidolihub.my.id/?slug=sambil-menggandeng-erat-tanganku-2026-02-14-260201200541';
 
 // Obfuscate URL parts to prevent exposure in network tab
 const urlParts = DECODED_URL.split('/');
@@ -1355,3 +1355,4 @@ document.addEventListener('DOMContentLoaded', function() {
     detectDevice();
     setupDoubleClickSeek();
 });
+
