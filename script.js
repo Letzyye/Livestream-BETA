@@ -432,8 +432,10 @@ async function checkAndShowStream() {
         
         const extracted = await autoExtractM3U8FromSlug();
         
+        // ALWAYS show player, regardless of extraction success
+        // (Either with extracted m3u8 or with fallback iframe)
         if (extracted && m3u8extractedUrl) {
-            console.log('✅ Stream available! Showing player...');
+            console.log('✅ Stream available! Showing player with extracted M3U8...');
             // Stop polling jika sudah berhasil
             if (autoPollingInterval) {
                 clearInterval(autoPollingInterval);
@@ -445,8 +447,13 @@ async function checkAndShowStream() {
             embedNgidolihubPlayer();
             updateVideoSource(m3u8extractedUrl);
         } else {
-            console.log('⚠️ Stream not available yet, will retry...');
-            // Keep landing page visible, akan retry setiap 10 detik
+            console.log('⚠️ M3U8 extraction failed, showing player with iframe fallback...');
+            // Still show stream using iframe method
+            landingPage.style.display = 'none';
+            playerContainer.style.display = 'block';
+            embedNgidolihubPlayer();
+            // Then try to extract m3u8 for HLS.js playback as backup
+            initLivestream();
         }
     } catch (err) {
         console.error('Stream check error:', err);
