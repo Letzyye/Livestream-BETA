@@ -1,17 +1,18 @@
 // ============ KEAMANAN LANJUTAN ============
 // Disable console & semua debugging
 (function() {
-    // Disable console
-    const noop = function() {};
-    console.log = noop;
-    console.warn = noop;
-    console.error = noop;
-    console.debug = noop;
-    console.info = noop;
-    console.table = noop;
-    console.time = noop;
-    console.timeLog = noop;
-    console.trace = noop;
+    // TEMPORARILY ENABLE CONSOLE FOR DEBUGGING
+    // Uncomment next lines to disable console in production
+    // const noop = function() {};
+    // console.log = noop;
+    // console.warn = noop;
+    // console.error = noop;
+    // console.debug = noop;
+    // console.info = noop;
+    // console.table = noop;
+    // console.time = noop;
+    // console.timeLog = noop;
+    // console.trace = noop;
     
     // Override toString untuk functions
     Function.prototype.toString = function() {
@@ -357,7 +358,6 @@ function showPlayer() {
     playerContainer.style.display = 'block';
     
     // AUTO-EXTRACT M3U8 dari slug DAN start playback
-    // JANGAN tampilkan iframe - prioritas extracted m3u8
     (async () => {
         const extracted = await autoExtractM3U8FromSlug();
         if (extracted && m3u8extractedUrl) {
@@ -432,20 +432,24 @@ async function checkAndShowStream() {
         
         const extracted = await autoExtractM3U8FromSlug();
         
+        // ALWAYS show player - either extracted m3u8 or iframe fallback
+        landingPage.style.display = 'none';
+        playerContainer.style.display = 'block';
+        
         if (extracted && m3u8extractedUrl) {
-            console.log('✅ Stream available! Showing HLS.js player with extracted M3U8...');
+            console.log('✅ Stream available! Using extracted M3U8...');
             // Stop polling
             if (autoPollingInterval) {
                 clearInterval(autoPollingInterval);
                 autoPollingInterval = null;
             }
             // Show player dengan extracted m3u8
-            landingPage.style.display = 'none';
-            playerContainer.style.display = 'block';
             updateVideoSource(m3u8extractedUrl);
         } else {
-            console.log('⚠️ M3U8 extraction failed, will retry...');
-            // Keep polling - don't show iframe yet
+            console.log('⚠️ Using iframe fallback...');
+            // Fallback: tampilkan iframe
+            embedNgidolihubPlayer();
+            initLivestream();
         }
     } catch (err) {
         console.error('Stream check error:', err);
