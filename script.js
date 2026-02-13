@@ -365,9 +365,8 @@ function showPlayer() {
             console.log('✅ Using extracted M3U8:', m3u8extractedUrl);
             updateVideoSource(m3u8extractedUrl);
         } else {
-            // Fallback: tampilkan iframe jika extraction gagal
-            console.log('⚠️ Fallback to iframe');
-            embedNgidolihubPlayer();
+            // Jika extraction gagal, tetap tampilkan player (mungui akan di-fix via polling)
+            console.log('⚠️ Extraction failed, player ready - will retry via polling');
             initLivestream();
         }
     })();
@@ -375,15 +374,9 @@ function showPlayer() {
 
 // Embed ngidolihub player as iframe
 function embedNgidolihubPlayer() {
-    const iframeHTML = `
-        <iframe 
-            src="${SOURCE_WEBSITE}" 
-            allowfullscreen 
-            allow="autoplay; fullscreen; encrypted-media"
-            style="width: 100%; height: 100%; border: none;"
-        ></iframe>
-    `;
-    iframeContainer.innerHTML = iframeHTML;
+    // REMOVED - No longer embedding Ngidoli iframe
+    // Using custom video player instead
+    console.log('Using custom video player with extracted M3U8');
 }
 
 // Setup double-click seek functionality
@@ -432,24 +425,22 @@ async function checkAndShowStream() {
         
         const extracted = await autoExtractM3U8FromSlug();
         
-        // ALWAYS show player - either extracted m3u8 or iframe fallback
-        landingPage.style.display = 'none';
-        playerContainer.style.display = 'block';
-        
         if (extracted && m3u8extractedUrl) {
-            console.log('✅ Stream available! Using extracted M3U8...');
-            // Stop polling
+            console.log('✅ Stream available! Showing player with extracted M3U8...');
+            // Stop polling if it's running
             if (autoPollingInterval) {
                 clearInterval(autoPollingInterval);
                 autoPollingInterval = null;
             }
             // Show player dengan extracted m3u8
+            landingPage.style.display = 'none';
+            playerContainer.style.display = 'block';
             updateVideoSource(m3u8extractedUrl);
+            offlineCount = 0; // Reset counter
         } else {
-            console.log('⚠️ Using iframe fallback...');
-            // Fallback: tampilkan iframe
-            embedNgidolihubPlayer();
-            initLivestream();
+            console.log('⚠️ Stream not detected - keeping landing page visible, will retry...');
+            // Keep landing page visible, don't show player yet
+            // Polling akan handle ini
         }
     } catch (err) {
         console.error('Stream check error:', err);
@@ -457,6 +448,10 @@ async function checkAndShowStream() {
 }
 
 // Auto-polling - coba setiap 10 detik sampai stream aktif
+// Track stream status
+let offlineCount = 0;
+const OFFLINE_THRESHOLD = 3; // After 3 failed attempts, consider stream offline
+
 function startAutoPolling() {
     if (autoPollingInterval) return; // Jangan buat duplicate
     
@@ -468,19 +463,40 @@ function startAutoPolling() {
         
         if (extracted && m3u8extractedUrl) {
             console.log('✅ Stream detected! Showing player now...');
-            clearInterval(autoPollingInterval);
-            autoPollingInterval = null;
-            // Show player
-            landingPage.style.display = 'none';
-            playerContainer.style.display = 'block';
-            embedNgidolihubPlayer();
+            offlineCount = 0; // Reset offline counter
+            
+            // Make sure player is visible
+            if (playerContainer.style.display === 'none') {
+                landingPage.style.display = 'none';
+                playerContainer.style.display = 'block';
+            }
+            
+            // Load video dengan extracted m3u8
             updateVideoSource(m3u8extractedUrl);
+        } else {
+            offlineCount++;
+            console.log(`⚠️ Stream offline (${offlineCount}/${OFFLINE_THRESHOLD})`);
+            
+            // If stream offline for too long, hide player and show landing
+            if (offlineCount >= OFFLINE_THRESHOLD) {
+                if (playerContainer.style.display !== 'none') {
+                    console.log('📺 Stream offline - hiding player and showing landing page');
+                    playerContainer.style.display = 'none';
+                    landingPage.style.display = 'block';
+                    
+                    // Stop polling jika sudah offline lama
+                    clearInterval(autoPollingInterval);
+                    autoPollingInterval = null;
+                    console.log('⏹️ Polling stopped - stream offline');
+                }
+            }
         }
     }, 10000); // Polling setiap 10 detik
 }
 
 // Run auto-detection saat page load
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Page loaded, checking stream...');
     await checkAndShowStream();
     // Jika belum bisa extract, start polling
     if (!isAutoM3U8Extracted) {
@@ -491,6 +507,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Also run it immediately if DOM sudah loaded
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', async () => {
+        console.log('🚀 Page loaded (via listener), checking stream...');
         await checkAndShowStream();
         if (!isAutoM3U8Extracted) {
             startAutoPolling();
@@ -498,6 +515,7 @@ if (document.readyState === 'loading') {
     });
 } else {
     setTimeout(async () => {
+        console.log('🚀 Page loaded (via timeout), checking stream...');
         await checkAndShowStream();
         if (!isAutoM3U8Extracted) {
             startAutoPolling();
