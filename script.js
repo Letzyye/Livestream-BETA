@@ -356,17 +356,18 @@ function showPlayer() {
     landingPage.style.display = 'none';
     playerContainer.style.display = 'block';
     
-    // Embed iframe dari ngidolihub
-    embedNgidolihubPlayer();
-    
-    // AUTO-EXTRACT M3U8 dan start playback
+    // AUTO-EXTRACT M3U8 dari slug DAN start playback
+    // JANGAN tampilkan iframe - prioritas extracted m3u8
     (async () => {
         const extracted = await autoExtractM3U8FromSlug();
         if (extracted && m3u8extractedUrl) {
-            // Load video dengan m3u8 yang sudah di-extract
+            // ✅ Load video dengan m3u8 yang sudah di-extract
+            console.log('✅ Using extracted M3U8:', m3u8extractedUrl);
             updateVideoSource(m3u8extractedUrl);
         } else {
-            // Fallback ke method lama (network interception)
+            // Fallback: tampilkan iframe jika extraction gagal
+            console.log('⚠️ Fallback to iframe');
+            embedNgidolihubPlayer();
             initLivestream();
         }
     })();
@@ -427,33 +428,24 @@ let autoPollingInterval = null; // Track polling interval
 
 async function checkAndShowStream() {
     try {
-        // Langsung extract M3U8 dari slug
         console.log('🔍 Checking stream availability...');
         
         const extracted = await autoExtractM3U8FromSlug();
         
-        // ALWAYS show player, regardless of extraction success
-        // (Either with extracted m3u8 or with fallback iframe)
         if (extracted && m3u8extractedUrl) {
-            console.log('✅ Stream available! Showing player with extracted M3U8...');
-            // Stop polling jika sudah berhasil
+            console.log('✅ Stream available! Showing HLS.js player with extracted M3U8...');
+            // Stop polling
             if (autoPollingInterval) {
                 clearInterval(autoPollingInterval);
                 autoPollingInterval = null;
             }
-            // Direct show player dengan m3u8 yang sudah ter-extract
+            // Show player dengan extracted m3u8
             landingPage.style.display = 'none';
             playerContainer.style.display = 'block';
-            embedNgidolihubPlayer();
             updateVideoSource(m3u8extractedUrl);
         } else {
-            console.log('⚠️ M3U8 extraction failed, showing player with iframe fallback...');
-            // Still show stream using iframe method
-            landingPage.style.display = 'none';
-            playerContainer.style.display = 'block';
-            embedNgidolihubPlayer();
-            // Then try to extract m3u8 for HLS.js playback as backup
-            initLivestream();
+            console.log('⚠️ M3U8 extraction failed, will retry...');
+            // Keep polling - don't show iframe yet
         }
     } catch (err) {
         console.error('Stream check error:', err);
