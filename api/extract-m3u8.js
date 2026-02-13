@@ -1,148 +1,123 @@
 // api/extract-m3u8.js - Vercel Serverless Function
-// Extract M3U8 dari HTML ngidolihub (server-side parsing)
-
-const fetch = require('node-fetch');
+// Extract M3U8 dari HTML ngidolihub
 
 const USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
 ];
 
 function getRandomUserAgent() {
     return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 }
 
-// Extract m3u8 dari berbagai pattern di HTML
 function extractM3U8FromHTML(html) {
     const m3u8Urls = [];
     
-    // Pattern 1: Direct m3u8 URL dalam script tag
-    const scriptRegex = /"([^"]*\.m3u8[^"]*)"/gi;
-    let match;
-    while ((match = scriptRegex.exec(html)) !== null) {
-        const url = match[1];
-        if (url.includes('http') && !m3u8Urls.includes(url)) {
-            m3u8Urls.push(url);
+    try {
+        // Pattern 1: .m3u8 dalam string
+        const pattern1 = /"([^"]*\.m3u8[^"]*)"/g;
+        let match;
+        while ((match = pattern1.exec(html)) !== null) {
+            const url = match[1];
+            if (url.includes('http') && !m3u8Urls.includes(url)) {
+                m3u8Urls.push(url);
+            }
         }
-    }
-    
-    // Pattern 2: Dalam player script configuration
-    const playerPattern = /\["[^"]*m3u8[^"]*","([^"]*)"\]/gi;
-    while ((match = playerPattern.exec(html)) !== null) {
-        const url = match[1];
-        if (url.includes('http') && !m3u8Urls.includes(url)) {
-            m3u8Urls.push(url);
+        
+        // Pattern 2: .m3u8 dengan single quotes
+        const pattern2 = /'([^']*\.m3u8[^']*)'/g;
+        while ((match = pattern2.exec(html)) !== null) {
+            const url = match[1];
+            if (url.includes('http') && !m3u8Urls.includes(url)) {
+                m3u8Urls.push(url);
+            }
         }
-    }
-    
-    // Pattern 3: Dalam atribut src atau data attributes
-    const attrPattern = /(?:src|data-src)="([^"]*\.m3u8[^"]*)"/gi;
-    while ((match = attrPattern.exec(html)) !== null) {
-        const url = match[1];
-        if (url.includes('http') && !m3u8Urls.includes(url)) {
-            m3u8Urls.push(url);
-        }
-    }
-    
-    // Pattern 4: HLS URL tanpa .m3u8 extension
-    const hlsPattern = /["']([^"']*hls[^"']*?)["']/gi;
-    while ((match = hlsPattern.exec(html)) !== null) {
-        const url = match[1];
-        if (url.includes('http') && url.length > 30) {
-            m3u8Urls.push(url);
-        }
+    } catch (e) {
+        console.error('[extract-m3u8] Parse error:', e.message);
     }
     
     return m3u8Urls;
 }
 
-// Fetch HTML dan extract m3u8
-async function fetchM3U8FromNgidoli(ngidoliUrl) {
-    try {
-        const response = await fetch(ngidoliUrl, {
-            method: 'GET',
-            headers: {
-                'User-Agent': getRandomUserAgent(),
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Referer': 'https://ngidolihub.or.id/',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Cache-Control': 'no-cache'
-            },
-            timeout: 15000
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const html = await response.text();
-        const m3u8URLs = extractM3U8FromHTML(html);
-        
-        if (m3u8URLs.length === 0) {
-            throw new Error('No M3U8 URLs found in HTML');
-        }
-        
-        return {
-            urls: m3u8URLs,
-            count: m3u8URLs.length,
-            primary: m3u8URLs[0]
-        };
-    } catch (error) {
-        throw new Error(`Failed to extract M3U8: ${error.message}`);
-    }
-}
-
-// Vercel Serverless Function Handler
 module.exports = async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+    
     try {
         const { slug, url } = req.query;
         
-        let ngidoliUrl;
+        console.log('[extract-m3u8] Request - slug:', slug, 'url:', url ? 'yes' : 'no');
         
-        if (url) {
-            ngidoliUrl = url;
-        } else if (slug) {
-            ngidoliUrl = `https://play.ngidolihub.my.id/?slug=${slug}`;
-        } else {
+        let ngidoliUrl = url || `https://play.ngidolihub.my.id/?slug=${slug}`;
+        
+        if (!slug && !url) {
             return res.status(400).json({ 
+                success: false,
                 error: 'Missing slug or url parameter'
             });
         }
         
-        // Fetch dan extract m3u8
-        const result = await fetchM3U8FromNgidoli(ngidoliUrl);
+        console.log('[extract-m3u8] Fetching:', ngidoliUrl);
         
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        // Fetch HTML
+        let html;
+        try {
+            const response = await fetch(ngidoliUrl, {
+                headers: {
+                    'User-Agent': getRandomUserAgent(),
+                    'Accept': 'text/html',
+                    'Referer': 'https://ngidolihub.or.id/',
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            html = await response.text();
+            console.log('[extract-m3u8] HTML fetched, length:', html.length);
+        } catch (fetchErr) {
+            console.error('[extract-m3u8] Fetch error:', fetchErr.message);
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to fetch: ' + fetchErr.message,
+                debug: 'Check if URL is accessible'
+            });
+        }
+        
+        // Extract m3u8
+        const m3u8URLs = extractM3U8FromHTML(html);
+        console.log('[extract-m3u8] Found URLs:', m3u8URLs.length);
+        
+        if (m3u8URLs.length === 0) {
+            console.warn('[extract-m3u8] No M3U8 found, returning mock');
+            return res.status(200).json({
+                success: false,
+                error: 'No M3U8 URL found in HTML',
+                debug: {
+                    htmlLength: html.length,
+                    slug: slug,
+                    url: ngidoliUrl
+                }
+            });
+        }
         
         return res.status(200).json({
             success: true,
-            m3u8_url: result.primary,
-            m3u8_urls: result.urls,
-            count: result.count,
-            timestamp: new Date().toISOString()
+            m3u8_url: m3u8URLs[0],
+            m3u8_urls: m3u8URLs,
+            count: m3u8URLs.length
         });
         
     } catch (error) {
-        console.error('Extract M3U8 error:', error);
+        console.error('[extract-m3u8] Exception:', error.message);
+        console.error('[extract-m3u8] Stack:', error.stack);
         
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        
-        return res.status(500).json({ 
+        return res.status(500).json({
             success: false,
-            error: error.message || 'Internal server error'
+            error: error.message,
+            type: error.constructor.name,
+            debug: 'Server error - check logs'
         });
     }
 };
