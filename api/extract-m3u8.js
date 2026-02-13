@@ -14,49 +14,88 @@ function extractM3U8FromHTML(html) {
     const m3u8Urls = [];
     
     try {
-        // Pattern 1: Full URLs with http/https
-        const patterns = [
-            /(https?:\/\/[^\s"'<>]*\.m3u8[^\s"'<>]*)/g,
-            /"([^"]*\.m3u8[^"]*)"/g,
-            /'([^']*\.m3u8[^']*)'/g,
-            /url:\s*["']?([^\s"'<>]*\.m3u8[^\s"'<>]*)["']?/g,
-            /src:\s*["']?([^\s"'<>]*\.m3u8[^\s"'<>]*)["']?/g,
-            /href:\s*["']?([^\s"'<>]*\.m3u8[^\s"'<>]*)["']?/g,
-        ];
+        // Strategy 1: Find all .m3u8 mentions and expand context
+        const m3u8Positions = [];
+        let index = html.indexOf('.m3u8');
+        while (index !== -1) {
+            m3u8Positions.push(index);
+            index = html.indexOf('.m3u8', index + 1);
+        }
         
-        for (const pattern of patterns) {
-            let match;
-            while ((match = pattern.exec(html)) !== null) {
-                let url = match[1] || match[0];
+        console.log(`[extract] Found ${m3u8Positions.length} .m3u8 mentions`);
+        
+        for (const pos of m3u8Positions) {
+            // Get surrounding context (look back and forward)
+            let start = pos;
+            let end = pos + 5; // ".m3u8"
+            
+            // Expand backwards to find start of URL (look for quotes, spaces, :, /)
+            while (start > 0) {
+                const char = html[start - 1];
+                if (char === '"' || char === "'" || char === ' ' || char === '\n' || char === '\t' || char === ':' || char === '>' || char === '<' || char === '{' || char === '}') {
+                    break;
+                }
+                start--;
+                if (start < pos - 500) break; // Limit backwards search
+            }
+            
+            // Expand forwards to find end of URL
+            while (end < html.length) {
+                const char = html[end];
+                if (char === '"' || char === "'" || char === ' ' || char === '\n' || char === '\t' || char === '>' || char === '<' || char === '}' || char === ',' || char === ';') {
+                    break;
+                }
+                end++;
+                if (end > pos + 500) break; // Limit forwards search
+            }
+            
+            let potential = html.substring(start, end).trim();
+            
+            // Clean up: remove leading/trailing non-URL chars
+            potential = potential.replace(/^[^a-zA-Z0-9\/\.]/g, '').replace(/[^a-zA-Z0-9\/\.\?&=\-_~:#@!$%'()*+,;]/g, '');
+            
+            if (potential.length > 5 && potential.includes('.m3u8')) {
+                console.log(`[extract] Found potential URL: ${potential.substring(0, 100)}`);
                 
-                // Skip if too short or already has duplicates
-                if (url && url.length > 5 && !m3u8Urls.includes(url)) {
-                    m3u8Urls.push(url);
+                if (!m3u8Urls.includes(potential)) {
+                    m3u8Urls.push(potential);
                 }
             }
         }
         
-        // Additional pattern: split by spaces and find .m3u8 files
-        const words = html.split(/[\s"'<>{}[\]()]/);
-        for (const word of words) {
-            if (word.includes('.m3u8') && word.length > 5) {
-                if (!m3u8Urls.includes(word)) {
-                    m3u8Urls.push(word);
-                }
+        // Strategy 2: Look for URLs with http/https pattern
+        const urlPattern = /(https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*)/gi;
+        let match;
+        while ((match = urlPattern.exec(html)) !== null) {
+            if (!m3u8Urls.includes(match[1])) {
+                m3u8Urls.push(match[1]);
+            }
+        }
+        
+        // Strategy 3: Look in data-playlist or similar attributes
+        const attrPattern = /(?:data-playlist|data-src|data-url|playlist|url|src)\s*[:=]\s*["']([^"'<>]*\.m3u8[^"'<>]*)["']/gi;
+        while ((match = attrPattern.exec(html)) !== null) {
+            if (!m3u8Urls.includes(match[1])) {
+                m3u8Urls.push(match[1]);
             }
         }
         
     } catch (e) {
-        console.error('[extract-m3u8] Parse error:', e.message);
+        console.error('[extract] Parse error:', e.message);
     }
     
-    // Filter valid URLs and limit to 10
-    return m3u8Urls.filter(u => u && u.length > 5).slice(0, 10);
+    // Filter and return
+    return m3u8Urls
+        .filter(u => u && u.length > 5)
+        .slice(0, 10);
 }
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     
     try {
         const { slug, url } = req.query;
@@ -105,14 +144,25 @@ module.exports = async (req, res) => {
         console.log('[extract-m3u8] Found URLs:', m3u8URLs.length);
         
         if (m3u8URLs.length === 0) {
-            console.warn('[extract-m3u8] No M3U8 found, returning mock');
+            console.warn('[extract-m3u8] No M3U8 found, HTML sample:');
+            
+            // Log first 2000 chars untuk inspection
+            const sample = html.substring(0, 2000);
+            console.log(sample);
+            
+            // Also log any .m3u8 mentions
+            const m3u8Mentions = html.match(/[^\s"'<>]*\.m3u8[^\s"'<>]*/g) || [];
+            console.log('[extract-m3u8] .m3u8 mentions in HTML:', m3u8Mentions.length);
+            
             return res.status(200).json({
                 success: false,
                 error: 'No M3U8 URL found in HTML',
                 debug: {
                     htmlLength: html.length,
                     slug: slug,
-                    url: ngidoliUrl
+                    url: ngidoliUrl,
+                    m3u8Count: m3u8Mentions.length,
+                    sampleMentions: m3u8Mentions.slice(0, 5)
                 }
             });
         }
