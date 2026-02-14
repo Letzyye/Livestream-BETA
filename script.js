@@ -146,7 +146,7 @@ document.addEventListener('keydown', function(e) {
 */
 
 // EDIT DISINI SAJA - PASTE LINK NGIDOLIHUB ANDA:
-const DECODED_URL = 'https://play.ngidolihub.my.id/?slug=sambil-menggandeng-erat-tanganku-2026-02-14-260201200541';
+const DECODED_URL = 'https://play.ngidolihub.my.id/?slug=pertaruhan-cinta-2026-02-13-260201200212';
 
 // Obfuscate URL parts to prevent exposure in network tab
 const urlParts = DECODED_URL.split('/');
@@ -322,9 +322,16 @@ async function autoExtractM3U8FromSlug() {
         const response = await fetch(extractEndpoint);
         const data = await response.json();
         
+        // Handle pending status
+        if (data.status === 'pending') {
+            console.warn('⏳ Stream is pending - not yet live');
+            showErrorNotification('⏳ Stream belum mulai - silahkan tunggu');
+            return false;
+        }
+        
         if (!data.success || !data.m3u8_url) {
             console.error('Extract M3U8 failed:', data.error);
-            showErrorNotification('Gagal extract M3U8: ' + (data.error || 'Unknown error'));
+            showErrorNotification('⚠️ ' + (data.error || 'Failed to extract M3U8'));
             return false;
         }
         
@@ -1355,4 +1362,3 @@ document.addEventListener('DOMContentLoaded', function() {
     detectDevice();
     setupDoubleClickSeek();
 });
-
