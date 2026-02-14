@@ -7,7 +7,8 @@
     "node": "24.x"
   },
   "dependencies": {
-    "node-fetch": "^2.6.11"
+    "node-fetch": "^2.6.11",
+    "puppeteer": "^21.0.0"
   },
   "scripts": {
     "dev": "vercel dev",

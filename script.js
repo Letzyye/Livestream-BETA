@@ -316,37 +316,61 @@ async function autoExtractM3U8FromSlug() {
         
         console.log('Auto-extracting M3U8 from slug:', slug);
         
-        // Call Vercel API untuk extract m3u8
-        const extractEndpoint = `${window.location.origin}/api/extract-m3u8?slug=${encodeURIComponent(slug)}`;
+        // Try primary extraction endpoint
+        let extractEndpoint = `${window.location.origin}/api/extract-m3u8?slug=${encodeURIComponent(slug)}`;
         
-        const response = await fetch(extractEndpoint);
-        const data = await response.json();
-        
-        // Handle pending status
-        if (data.status === 'pending') {
-            console.warn('⏳ Stream is pending - not yet live');
-            showErrorNotification('⏳ Stream belum mulai - silahkan tunggu');
-            return false;
+        try {
+            const response = await fetch(extractEndpoint);
+            const data = await response.json();
+            
+            console.log('[Primary] Response:', data.status || data.error);
+            
+            // Handle pending status
+            if (data.status === 'pending') {
+                console.warn('⏳ Stream is pending - not yet live');
+                return false;
+            }
+            
+            if (data.success && data.m3u8_url) {
+                m3u8extractedUrl = data.m3u8_url;
+                isAutoM3U8Extracted = true;
+                console.log('✅ M3U8 extracted (primary):', m3u8extractedUrl.substring(0, 60) + '...');
+                return true;
+            }
+        } catch (error) {
+            console.error('[Primary] Extraction failed:', error.message);
         }
         
-        if (!data.success || !data.m3u8_url) {
-            console.error('Extract M3U8 failed:', data.error);
-            showErrorNotification('⚠️ ' + (data.error || 'Failed to extract M3U8'));
-            return false;
+        // Try alternative extraction endpoint if primary failed
+        console.log('[Fallback] Trying alternative extraction endpoint...');
+        extractEndpoint = `${window.location.origin}/api/extract-m3u8-alt?slug=${encodeURIComponent(slug)}`;
+        
+        try {
+            const response = await fetch(extractEndpoint);
+            const data = await response.json();
+            
+            console.log('[Fallback] Response:', data.status || data.error);
+            
+            if (data.status === 'pending') {
+                console.warn('⏳ Stream is pending - not yet live');
+                return false;
+            }
+            
+            if (data.success && data.m3u8_url) {
+                m3u8extractedUrl = data.m3u8_url;
+                isAutoM3U8Extracted = true;
+                console.log('✅ M3U8 extracted (fallback):', m3u8extractedUrl.substring(0, 60) + '...');
+                return true;
+            }
+        } catch (error) {
+            console.error('[Fallback] Alternative extraction failed:', error.message);
         }
         
-        // Simpan m3u8 URL yang sudah di-extract
-        m3u8extractedUrl = data.m3u8_url;
-        isAutoM3U8Extracted = true;
-        
-        console.log('✅ M3U8 extracted successfully:', m3u8extractedUrl);
-        console.log('Found ' + data.count + ' alternative URLs');
-        
-        return true;
+        console.error('Both extraction attempts failed');
+        return false;
         
     } catch (error) {
         console.error('Auto-extract M3U8 error:', error);
-        showErrorNotification('Error extracting M3U8: ' + error.message);
         return false;
     }
 }
