@@ -141,10 +141,29 @@ module.exports = async (req, res) => {
             });
         }
         
-        // Check for pending status
+        // Check for pending status - BUT ONLY IF NO M3U8 FOUND FIRST
+        // Extract m3u8 first to determine actual status
+        const m3u8URLs = extractM3U8FromHTML(html);
+        console.log('[extract-m3u8] Found URLs:', m3u8URLs.length);
+        
+        // If M3U8 found, stream is definitely LIVE (ignore pending keywords)
+        if (m3u8URLs.length > 0) {
+            console.log('[extract-m3u8] Stream is LIVE - M3U8 URLs found');
+            return res.status(200).json({
+                success: true,
+                m3u8_url: m3u8URLs[0],
+                m3u8_urls: m3u8URLs,
+                count: m3u8URLs.length
+            });
+        }
+        
+        // If NO M3U8 found, check for pending keywords
         const isPending = html.toLowerCase().includes('pending') || 
                          html.toLowerCase().includes('sedang dipersiapkan') ||
-                         html.toLowerCase().includes('coming soon');
+                         html.toLowerCase().includes('coming soon') ||
+                         html.toLowerCase().includes('belum mulai');
+        
+        console.log('[extract-m3u8] No M3U8 found - isPending:', isPending);
         
         if (isPending) {
             console.warn('[extract-m3u8] Stream is pending');
@@ -160,39 +179,27 @@ module.exports = async (req, res) => {
             });
         }
         
-        // Extract m3u8
-        const m3u8URLs = extractM3U8FromHTML(html);
-        console.log('[extract-m3u8] Found URLs:', m3u8URLs.length);
+        // No M3U8 and not pending - log debug info
+        console.warn('[extract-m3u8] No M3U8 found, HTML sample:');
         
-        if (m3u8URLs.length === 0) {
-            console.warn('[extract-m3u8] No M3U8 found, HTML sample:');
-            
-            // Log first 2000 chars untuk inspection
-            const sample = html.substring(0, 2000);
-            console.log(sample);
-            
-            // Also log any .m3u8 mentions
-            const m3u8Mentions = html.match(/[^\s"'<>]*\.m3u8[^\s"'<>]*/g) || [];
-            console.log('[extract-m3u8] .m3u8 mentions in HTML:', m3u8Mentions.length);
-            
-            return res.status(200).json({
-                success: false,
-                error: 'No M3U8 URL found in HTML',
-                debug: {
-                    htmlLength: html.length,
-                    slug: slug,
-                    url: ngidoliUrl,
-                    m3u8Count: m3u8Mentions.length,
-                    sampleMentions: m3u8Mentions.slice(0, 5)
-                }
-            });
-        }
+        // Log first 2000 chars untuk inspection
+        const sample = html.substring(0, 2000);
+        console.log(sample);
+        
+        // Also log any .m3u8 mentions
+        const m3u8Mentions = html.match(/[^\s"'<>]*\.m3u8[^\s"'<>]*/g) || [];
+        console.log('[extract-m3u8] .m3u8 mentions in HTML:', m3u8Mentions.length);
         
         return res.status(200).json({
-            success: true,
-            m3u8_url: m3u8URLs[0],
-            m3u8_urls: m3u8URLs,
-            count: m3u8URLs.length
+            success: false,
+            error: 'No M3U8 URL found in HTML',
+            debug: {
+                htmlLength: html.length,
+                slug: slug,
+                url: ngidoliUrl,
+                m3u8Count: m3u8Mentions.length,
+                sampleMentions: m3u8Mentions.slice(0, 5)
+            }
         });
         
     } catch (error) {
