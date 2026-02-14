@@ -75,6 +75,11 @@ function extractM3U8FromHTML(html) {
             .filter(u => u && u.length > 5 && u.includes('m3u8'))
             .filter((v, i, a) => a.indexOf(v) === i) // Remove duplicates
             .slice(0, 10);
+    } catch (error) {
+        console.error('[extractM3U8FromHTML] Error:', error.message);
+        return [];
+    }
+}
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
