@@ -104,16 +104,22 @@ module.exports = async (req, res) => {
         
         console.log('[extract-m3u8] Fetching:', ngidoliUrl);
         
-        // Fetch HTML
+        // Fetch HTML dengan timeout
         let html;
         try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+            
             const response = await fetch(ngidoliUrl, {
                 headers: {
                     'User-Agent': getRandomUserAgent(),
                     'Accept': 'text/html',
                     'Referer': 'https://ngidolihub.or.id/',
-                }
+                },
+                signal: controller.signal
             });
+            
+            clearTimeout(timeout);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -123,10 +129,34 @@ module.exports = async (req, res) => {
             console.log('[extract-m3u8] HTML fetched, length:', html.length);
         } catch (fetchErr) {
             console.error('[extract-m3u8] Fetch error:', fetchErr.message);
-            return res.status(500).json({
+            
+            const errorMsg = fetchErr.name === 'AbortError' ? 
+                'Request timeout (15s)' : 
+                'Failed to fetch: ' + fetchErr.message;
+            
+            return res.status(503).json({
                 success: false,
-                error: 'Failed to fetch: ' + fetchErr.message,
-                debug: 'Check if URL is accessible'
+                error: errorMsg,
+                debug: 'The source server may be down or too slow. Try again in a few moments.'
+            });
+        }
+        
+        // Check for pending status
+        const isPending = html.toLowerCase().includes('pending') || 
+                         html.toLowerCase().includes('sedang dipersiapkan') ||
+                         html.toLowerCase().includes('coming soon');
+        
+        if (isPending) {
+            console.warn('[extract-m3u8] Stream is pending');
+            return res.status(200).json({
+                success: false,
+                error: 'Stream is still pending - not yet live',
+                status: 'pending',
+                debug: {
+                    htmlLength: html.length,
+                    slug: slug,
+                    url: ngidoliUrl
+                }
             });
         }
         
